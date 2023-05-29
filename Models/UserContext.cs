@@ -1,4 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Aton.Controllers;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json.Linq;
+using System.Security.Claims;
 
 namespace Aton.Models
 {
@@ -10,7 +15,7 @@ namespace Aton.Models
         }
 
         public DbSet<User> UserItems { get; set; } = null!;
-        public static void SeedAdminUser(UserContext context)
+        public static async Task SeedAdminUser(UserContext context, IHttpContextAccessor httpContextAccessor)
         {
             // Check if the admin user already exists in the database
             var adminUser = context.UserItems.FirstOrDefault(u => u.Login == "admin");
@@ -18,17 +23,37 @@ namespace Aton.Models
             if (adminUser == null)
             {
                 // Create a new admin user
-                var admin = new User
+                adminUser = new User
                 {
                     Login = "admin",
                     Password = "admin",
                     Birthday = DateTime.Now,
-                    Name = "Administrator"
+                    Name = "Administrator",
+                    CreatedBy = "admin",
+                    CreatedOn = DateTime.Now,
+                    Admin = true
                 };
-
-                context.UserItems.Add(admin);
+                var token = UsersControllerEntity.GenerateNewToken(adminUser);
+                adminUser.JwtToken = token;
+                context.UserItems.Add(adminUser);
                 context.SaveChanges();
             }
+            var httpContext = httpContextAccessor.HttpContext;
+            //if (httpContext != null)
+            //{
+                // Authenticate the host as the admin user
+                var claims = new List<Claim>
+    {
+        new Claim(ClaimTypes.NameIdentifier, adminUser.Guid.ToString()),
+        new Claim(ClaimTypes.Name, adminUser.Login),
+        new Claim(ClaimTypes.Role, "Admin")
+
+    };
+    
+
+                var identity = new ClaimsIdentity(claims, JwtBearerDefaults.AuthenticationScheme);
+                httpContext.User = new ClaimsPrincipal(identity);
+            //}
         }
 
     }

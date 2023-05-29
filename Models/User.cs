@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
-
 namespace Aton.Models
 {
     [PrimaryKey(nameof(Guid))]
@@ -23,7 +22,7 @@ namespace Aton.Models
                 if (IsLatinAndNumbers(value))
                     login = value;
                 else
-                    throw new Exception();
+                    throw new ArgumentException("Your login is not only latin and numbers");
             }
         }
        
@@ -34,7 +33,7 @@ namespace Aton.Models
                 if (IsLatinAndNumbers(value))
                     password = value;
                 else
-                    throw new Exception();
+                    throw new ArgumentException("Your password is not only latin and numbers");
             }
         }
         public string Name
@@ -48,7 +47,7 @@ namespace Aton.Models
                 if (Regex.IsMatch(value, pattern))
                     name = value;
                 else
-                    throw new Exception();
+                    throw new ArgumentException("Your name should consist only of russian and latin symbols");
             }
         }
         public int Gender { get { return gender; } set
@@ -56,7 +55,7 @@ namespace Aton.Models
                 if (value >= 0 && value < 3)
                     gender = value;
                 else
-                    throw new Exception();
+                    throw new ArgumentException("Incorrect gender number. 0 - Female, 1 - Male, 2 - Unknown");
             }
         }
         public bool Admin { get; set; }

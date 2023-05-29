@@ -13,6 +13,7 @@ using System.Text;
 using NuGet.Protocol.Plugins;
 using Microsoft.AspNetCore.Authorization;
 using Swashbuckle.AspNetCore.Annotations;
+using Microsoft.AspNetCore.Identity;
 
 namespace Aton.Controllers
 {
@@ -27,8 +28,8 @@ namespace Aton.Controllers
             _context = context;
         }
        
-       
-        static string GenerateNewToken(User user)
+        DateTime dtPlaceholder = new DateTime(2000, 1, 1);
+        public static string GenerateNewToken(User user)
         {
             // Create a JWT token for the user
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -48,10 +49,104 @@ namespace Aton.Controllers
             return tokenHandler.WriteToken(token);
 
         }
+
+        // POST: api/UsersControllerEntity 1) Создание пользователя по логину, паролю, имени, полу и дате рождения + указание будет ли
+        //пользователь админом(Доступно Админам)
+        [HttpPost("Create user")]
+        //[Authorize]
+        public async Task<ActionResult<User>> CreateUser(string yourLogin, string yourPassword, string login, string pass, string name, int gender, DateTime birthday, bool isAdmin)
+        {
+            if (_context.UserItems == null)
+            {
+                return Problem("Entity set 'UserContext.UserItems'  is null.");
+            }
+            var admin = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == yourLogin);
+
+            if (admin == null)
+                return BadRequest("User not found");
+
+            if (admin.Password != yourPassword)
+                return BadRequest("Incorrect password");
+
+            if (!admin.Admin)
+                return BadRequest("You do not have access to this method");
+            //var userClaims = User.Claims;
+            //var loginClaim = userClaims.FirstOrDefault(c => c.Type == ClaimTypes.Name).Value;
+            //var admin = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == loginClaim);
+            try
+            {
+                User user = new User
+                {
+                    Login = login,
+                    Password = pass,
+                    Name = name,
+                    Gender = gender,
+                    Birthday = birthday,
+                    Admin = isAdmin,
+                    CreatedOn = DateTime.Now,
+                    CreatedBy = yourLogin,
+                    ModifiedBy = "",
+                    ModifiedOn = null,
+                    RevokedBy = "",
+                    RevokedOn = null
+                };
+                //user.JwtToken = GenerateNewToken(user);
+                _context.UserItems.Add(user);
+
+                await _context.SaveChangesAsync();
+
+                var response = new
+                {
+                    user.Login,
+                    user.Password,
+                    //Token = user.JwtToken
+                };
+
+                return CreatedAtAction(nameof(CreateUser), response);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("Update profile")]
+        public async Task<IActionResult> UpdateOneProfile(string yourLogin, string yourPassword, string? name, int? gender, DateTime? birthday)
+        {
+            try
+            {
+                var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == yourLogin);
+
+                if (user == null)
+                {
+                    return NotFound();
+                }
+
+                //user.Name = name;
+                //user.Gender = gender;
+                //user.Birthday = birthday;
+
+
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                //if (!UserExists(user))
+                //{
+                //    return NotFound();
+                //}
+                //else
+                //{
+                //    throw;
+                //}
+            }
+
+            return Ok("Successfully updated profile");
+        }
         // GET: api/UsersControllerEntity
         [HttpGet("Get active users")]
         [SwaggerOperation(Summary = "Get all active users", Description = "Retrieves a list of all active users.")]
-        [Authorize]
+
         public async Task<ActionResult<IEnumerable<User>>> GetAllActiveUsers()
         {
             if (_context.UserItems == null)
@@ -59,6 +154,12 @@ namespace Aton.Controllers
                 return NotFound();
             }
             var users = await _context.UserItems.Where(u => u.RevokedOn == null).OrderBy(u => u.CreatedOn).ToListAsync();
+
+            foreach (var item in HttpContext.User.Claims)
+            {
+                System.Console.WriteLine(item);
+            }
+
             return users;
         }
         [HttpGet("Get users above age")]
@@ -77,7 +178,7 @@ namespace Aton.Controllers
 
         // GET: api/UsersControllerEntity/5
         [HttpGet("Get self information")]
-        [Authorize]
+    
         public async Task<ActionResult<object>> GetUserSelf(string login, string pass)
         {
           if (_context.UserItems == null)
@@ -166,7 +267,7 @@ namespace Aton.Controllers
             {
                 return NotFound();
             }
-            var user = await _context.UserItems.FindAsync(login);
+            var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == login);
             if (user == null)
             {
                 return NotFound();
@@ -180,59 +281,9 @@ namespace Aton.Controllers
             return NoContent();
         }
 
-        // POST: api/UsersControllerEntity 1) Создание пользователя по логину, паролю, имени, полу и дате рождения + указание будет ли
-        //пользователь админом(Доступно Админам)
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost("Create user")]
-        [Authorize]
-        public async Task<ActionResult<User>> CreateUser(string login, string pass,string name, int gender, DateTime birthday, bool isAdmin)
-        {
-          if (_context.UserItems == null)
-          {
-              return Problem("Entity set 'UserContext.UserItems'  is null.");
-          }
-            //user.JwtToken = GenerateNewToken(user);
-            //_context.UserItems.Add(user);
-            System.Console.WriteLine(login);
-            System.Console.WriteLine(birthday);
-            await _context.SaveChangesAsync();
+        
 
-            return CreatedAtAction("Created user:", new { login, pass});
-        }
-
-        [HttpPut("Update profile")]
-        public async Task<IActionResult> UpdateOneProfile(Guid id, string name, int gender, DateTime birthday)
-        {
-            try
-            {
-                var user = await _context.UserItems.FindAsync(id);
-
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-            user.Name = name;
-            user.Gender = gender;
-            user.Birthday = birthday;
-
-          
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!UserExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
+       
 
 
         [HttpPut("Update password")]
@@ -306,7 +357,11 @@ namespace Aton.Controllers
             }
             user.JwtToken = GenerateNewToken(user);
             _context.UserItems.Add(user);
-            System.Console.WriteLine(HttpContext.User.Claims);
+            foreach (var item in HttpContext.User.Claims)
+            {
+                System.Console.WriteLine(item);
+            }
+           
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("Created user:", new { user.Login, user.Password, user.JwtToken });

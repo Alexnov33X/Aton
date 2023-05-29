@@ -13,6 +13,7 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<UserContext>(opt =>
     opt.UseInMemoryDatabase("UserList"));
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -63,12 +64,17 @@ builder.Services.AddAuthentication(options =>
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+// Middleware to authorize the host as an admin during startup
+app.Use(async (context, next) =>
 {
-    var services = scope.ServiceProvider;
-    var context = services.GetRequiredService<UserContext>();
-    UserContext.SeedAdminUser(context);
-}
+    var dbContext = context.RequestServices.GetRequiredService<UserContext>();
+    var httpContextAccessor = context.RequestServices.GetRequiredService<IHttpContextAccessor>();
+
+    // Perform your logic to authorize the host as an admin here
+    await UserContext.SeedAdminUser(dbContext, httpContextAccessor);
+
+    await next.Invoke();
+});
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -77,7 +83,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
