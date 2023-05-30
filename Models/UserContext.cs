@@ -25,11 +25,11 @@ namespace Aton.Models
                 // Create a new admin user
                 adminUser = new User
                 {
-                    Login = "admin",
-                    Password = "admin",
+                    Login = "Admin",
+                    Password = "Admin",
                     Birthday = DateTime.Now,
-                    Name = "Administrator",
-                    CreatedBy = "admin",
+                    Name = "Admin",
+                    CreatedBy = "Admin",
                     CreatedOn = DateTime.Now,
                     Admin = true
                 };
