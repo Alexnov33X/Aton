@@ -23,16 +23,15 @@ namespace Aton.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UsersControllerEntity : ControllerBase
+    public class UsersController : ControllerBase
     {
         private readonly UserContext _context;
 
-        public UsersControllerEntity(UserContext context)
+        public UsersController(UserContext context)
         {
             _context = context;
         }
        
-        DateTime dtPlaceholder = new DateTime(2000, 1, 1);
         public static string GenerateNewToken(User user)
         {
             // Create a JWT token for the user
@@ -57,8 +56,12 @@ namespace Aton.Controllers
         // POST: api/UsersControllerEntity 1) Создание пользователя по логину, паролю, имени, полу и дате рождения + указание будет ли
         //пользователь админом(Доступно Админам)
         [HttpPost("Create user")]
-        //[Authorize]
-        public async Task<ActionResult<User>> CreateUser(string yourLogin, string yourPassword, string login, string pass, string name, int gender, DateTime birthday, bool isAdmin)
+        [ProducesResponseType(typeof(User), 201)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(401)]
+        [ProducesResponseType(403)]
+        [ProducesResponseType(404)]
+        public async Task<ActionResult<User>> CreateUser( string userLogin, string userPassword, string userName, int userGender, DateTime userBirthday, bool userIsAdmin, string yourLogin = "admin", string yourPassword = "admin")
         {
             if (_context.UserItems == null)
             {
@@ -81,12 +84,12 @@ namespace Aton.Controllers
             {
                 User user = new User
                 {
-                    Login = login,
-                    Password = pass,
-                    Name = name,
-                    Gender = gender,
-                    Birthday = birthday,
-                    Admin = isAdmin,
+                    Login = userLogin,
+                    Password = userPassword,
+                    Name = userName,
+                    Gender = userGender,
+                    Birthday = userBirthday,
+                    Admin = userIsAdmin,
                     CreatedOn = DateTime.Now,
                     CreatedBy = yourLogin,
                     ModifiedBy = "",
@@ -99,14 +102,14 @@ namespace Aton.Controllers
 
                 await _context.SaveChangesAsync();
 
-                var response = new
-                {
-                    user.Login,
-                    user.Password,
-                    //Token = user.JwtToken
-                };
+                //var response = new
+                //{
+                //    user.Login,
+                //    user.Password,
+                //    //Token = user.JwtToken
+                //};
 
-                return CreatedAtAction(nameof(CreateUser), response);
+                return CreatedAtAction(nameof(CreateUser), user);
             }
             catch (ArgumentException ex)
             {
@@ -118,7 +121,7 @@ namespace Aton.Controllers
 //лично пользователь, если он активен (отсутствует RevokedOn))
         [HttpPut("Update profile")]
 
-        public async Task<IActionResult> UpdateOneProfile(string yourLogin, string yourPassword, string? targetedUser, string? name = null, int? gender = null, DateTime? birthday = null)
+        public async Task<IActionResult> UpdateOneProfile(string? userLogin, string? name = null, int? gender = null, DateTime? birthday = null, string yourLogin = "admin", string yourPassword = "admin")
         {
 
             var admin = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == yourLogin);
@@ -136,7 +139,7 @@ namespace Aton.Controllers
             {
                 try
                 {
-                    var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == targetedUser);
+                    var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == userLogin);
                     if (user == null)
                         return BadRequest("User to be changed not found");
                     if (name != null)
@@ -182,7 +185,7 @@ namespace Aton.Controllers
 //        Изменение пароля(Пароль может менять либо Администратор, либо лично пользователь, если
 //он активен (отсутствует RevokedOn))
         [HttpPut("Update password")]
-        public async Task<IActionResult> UpdateOnePassword(string yourLogin, string yourPassword, string pass)
+        public async Task<IActionResult> UpdateOnePassword(string newPassword, string yourLogin = "admin", string yourPassword = "admin")
         {
             try
             {
@@ -197,7 +200,7 @@ namespace Aton.Controllers
                 if (!admin.Admin && admin.RevokedOn != null)
                     return Unauthorized("You do not have access to this method. Your account is revoked");
 
-                admin.Password = pass;
+                admin.Password = newPassword;
 
                 await _context.SaveChangesAsync();
                 return Ok("You have updated your password");
@@ -211,7 +214,7 @@ namespace Aton.Controllers
 //        Изменение логина(Логин может менять либо Администратор, либо лично пользователь, если
 //он активен (отсутствует RevokedOn), логин должен оставаться уникальным)
         [HttpPut("Update login")]
-        public async Task<IActionResult> UpdateOneLogin(string yourLogin, string yourPassword, string login)
+        public async Task<IActionResult> UpdateOneLogin(string newLogin, string yourLogin = "admin", string yourPassword = "admin")
         {
             try
             {
@@ -226,7 +229,7 @@ namespace Aton.Controllers
                 if (!admin.Admin && admin.RevokedOn != null)
                     return Unauthorized("You do not have access to this method. Your account is revoked");
 
-                admin.Login = login;
+                admin.Login = newLogin;
 
                 await _context.SaveChangesAsync();
                 return Ok("You have updated your login");
@@ -242,7 +245,7 @@ namespace Aton.Controllers
         [HttpGet("Get active users")]
         [SwaggerOperation(Summary = "Get all active users", Description = "Retrieves a list of all active users.")]
 
-        public async Task<ActionResult<IEnumerable<User>>> GetAllActiveUsers(string yourLogin, string yourPassword)
+        public async Task<ActionResult<IEnumerable<User>>> GetAllActiveUsers(string yourLogin = "admin", string yourPassword = "admin")
         {
             try
             {
@@ -274,7 +277,7 @@ namespace Aton.Controllers
 //или нет(Доступно Админам)
         [HttpGet("Get user by login")]
         //[Authorize]
-        public async Task<ActionResult<object>> GetUser(string yourLogin, string yourPassword, string login)
+        public async Task<ActionResult<object>> GetUser(string userLogin, string yourLogin = "admin", string yourPassword = "admin")
         {
             try
             {
@@ -292,7 +295,7 @@ namespace Aton.Controllers
                 if (_context.UserItems == null)             
                     return NotFound();
                 
-            var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == login);
+            var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == userLogin);
 
             if (user == null)          
                 return NotFound("User not found");
@@ -317,7 +320,7 @@ namespace Aton.Controllers
         //        Запрос пользователя по логину и паролю(Доступно только самому пользователю, если он
         //активен (отсутствует RevokedOn))
         [HttpGet("Get self information")]
-        public async Task<ActionResult<object>> GetSelfInformation(string yourLogin, string yourPassword)
+        public async Task<ActionResult<object>> GetSelfInformation(string yourLogin = "admin", string yourPassword = "admin")
         {
             try
             {
@@ -346,7 +349,7 @@ namespace Aton.Controllers
         //Запрос всех пользователей старше определённого возраста(Доступно Админам)
         [HttpGet("Get users above age")]
         //[Authorize]
-        public async Task<ActionResult<IEnumerable<User>>> GetAllUsersAboveAge(string yourLogin, string yourPassword, int age)
+        public async Task<ActionResult<IEnumerable<User>>> GetAllUsersAboveAge(int age, string yourLogin = "admin", string yourPassword = "admin")
         {
             try
             {
@@ -378,7 +381,7 @@ namespace Aton.Controllers
 //происходить простановка RevokedOn и RevokedBy) (Доступно Админам)
         [HttpPut("Soft delete of user")]
         //[Authorize]
-        public async Task<IActionResult> DeleteUserSoft(string yourLogin, string yourPassword, string targetedUser)
+        public async Task<IActionResult> DeleteUserSoft(string userLogin, string yourLogin = "admin", string yourPassword = "admin")
         {
             try
             {
@@ -395,7 +398,7 @@ namespace Aton.Controllers
 
                 if (_context.UserItems == null)
                     return NotFound();
-                var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == targetedUser);
+                var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == userLogin);
                 if (user == null)
                     return BadRequest("User to be changed not found");
                
@@ -416,7 +419,7 @@ namespace Aton.Controllers
         //        Удаление пользователя по логину полное (Доступно Админам)
         [HttpDelete("Hard delete of user")]
         //[Authorize]
-        public async Task<IActionResult> DeleteUserHard(string yourLogin, string yourPassword, string targetedUser)
+        public async Task<IActionResult> DeleteUserHard(string userLogin, string yourLogin = "admin", string yourPassword = "admin")
         {
             try
             {
@@ -433,7 +436,7 @@ namespace Aton.Controllers
 
                 if (_context.UserItems == null)
                     return NotFound();
-                var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == targetedUser);
+                var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == userLogin);
                 if (user == null)
                     return BadRequest("User to be deleted not found");
 
@@ -510,7 +513,7 @@ namespace Aton.Controllers
         //[Authorize]
         //Восстановление пользователя - Очистка полей(RevokedOn, RevokedBy) (Доступно Админам)
         [HttpPut("Restore user by login")]
-        public async Task<IActionResult> RestoreUser(string yourLogin, string yourPassword, string login )
+        public async Task<IActionResult> RestoreUser(string userLogin, string yourLogin = "admin", string yourPassword = "admin")
         {
             try
             {
@@ -527,7 +530,7 @@ namespace Aton.Controllers
                 if (!admin.Admin)
                     return Unauthorized("You do not have access to this method. You are not an admin");
 
-                var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == login);
+                var user = await _context.UserItems.FirstOrDefaultAsync(u => u.Login == userLogin);
                 if (user == null)
                     return NotFound("User not found");
                 user.RevokedOn = null;

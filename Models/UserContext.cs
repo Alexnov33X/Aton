@@ -33,7 +33,7 @@ namespace Aton.Models
                     CreatedOn = DateTime.Now,
                     Admin = true
                 };
-                var token = UsersControllerEntity.GenerateNewToken(adminUser);
+                var token = UsersController.GenerateNewToken(adminUser);
                 adminUser.JwtToken = token;
                 context.UserItems.Add(adminUser);
                 context.SaveChanges();
